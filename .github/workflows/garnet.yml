@@ -16,3 +16,24 @@ jobs:
         uses: garnet-org/action@v1
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
+
+      # Safe-ish detection trigger workload (should produce detections)
+      - name: Trigger detections (safe test)
+        run: |
+          set -euxo pipefail
+
+          whoami
+          id
+          uname -a
+          ps aux | head
+          env | head
+
+          cat /etc/passwd | head
+          cat /etc/shadow || true
+          ls -la ~/.ssh || true
+          cat /proc/self/environ | tr '\0' '\n' | head || true
+
+          sudo apt-get update
+          sudo apt-get install -y nmap netcat-traditional
+          nmap -sV 127.0.0.1 || true
+          nc -vz 127.0.0.1 22 || true
