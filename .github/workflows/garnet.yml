@@ -3,8 +3,6 @@ name: Garnet CI Monitoring
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   monitor:
@@ -17,31 +15,17 @@ jobs:
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
-      - name: Workload (Node + Solidity + Python)
+      # This is what should trigger simple detections like npm registry connections
+      - name: Generate runtime activity
         run: |
           set -euxo pipefail
+          node -v
+          npm -v
+          npm ci || npm install
+          npm pack || true
+          curl -I https://registry.npmjs.org/ || true
+          python3 -V
+          pip3 -V
+          pip3 install requests
+          python3 -c "import requests; print(requests.get('https://pypi.org/simple/').status_code)"
 
-          echo "=== System info ==="
-          id
-          uname -a
-          node -v || true
-          npm -v || true
-          python3 -V || true
-          pip3 -V || true
-
-          echo "=== Install node deps ==="
-          npm ci
-
-          echo "=== Hardhat compile + test + local chain ==="
-          npm run build
-          npm test
-
-          echo "=== Run node workload ==="
-          npm run workload
-
-          echo "=== Python deps + run probe ==="
-          python3 -m pip install --upgrade pip
-          pip3 install -r python/requirements.txt
-          python3 python/chain_probe.py
-
-          echo "DONE"
