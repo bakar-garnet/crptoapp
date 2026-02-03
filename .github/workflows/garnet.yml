@@ -3,8 +3,6 @@ name: Garnet CI Monitoring
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   monitor:
@@ -12,35 +10,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ✅ EXACT Garnet snippet you posted
+      # ✅ EXACT snippet
       - name: Add Garnet Monitor
         uses: garnet-org/action@v1
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
-      # 🔥 Workload (generates file/network/exec/env behaviors)
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install root deps
-        run: npm install
-
-      - name: Install Python deps
-        run: pip install -r python/requirements.txt
-
-      - name: Run “behavior soup”
-        env:
-          INFURA_URL: "https://mainnet.infura.io/v3/INVALID_KEY_OK"
-          ALCHEMY_URL: "https://eth-mainnet.g.alchemy.com/v2/INVALID_KEY_OK"
-          SOME_SECRET: "not-a-real-secret"
+      # 🔥 No-deps “behavior soup” (should create file/exec/network/env events)
+      - name: Generate runtime behaviors
+        shell: bash
         run: |
-          node tools/behavior-soup.mjs
-          (cd contracts && npm install && npx hardhat compile)
-          python python/chain_probe.py
+          set -euxo pipefail
+
+          # file reads
+          cat /etc/os-release || true
+          cat /etc/passwd || true
+          cat /proc/cpuinfo | head -n 30 || true
+          cat /proc/self/environ | tr '\0' '\n' | head -n 30 || true
+
+          # exec + shell spawn
+          id || true
+          whoami || true
+          uname -a || true
+          ps aux | head -n 10 || true
+          bash -lc 'echo shell_spawned && env | head -n 20' || true
+
+          # network (dns + http)
+          curl -I https://example.com || true
+          curl -I https://api.github.com || true
+          getent hosts example.com || true
