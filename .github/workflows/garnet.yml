@@ -17,23 +17,20 @@ jobs:
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
-      # Safe-ish detection trigger workload (should produce detections)
-      - name: Trigger detections (safe test)
+      - name: Post-monitor proof
         run: |
-          set -euxo pipefail
-
-          whoami
+          echo "MONITOR INSTALLED - NOW RUNNING WORKLOAD"
           id
           uname -a
           ps aux | head
-          env | head
 
-          cat /etc/passwd | head
-          cat /etc/shadow || true
-          ls -la ~/.ssh || true
-          cat /proc/self/environ | tr '\0' '\n' | head || true
+      - name: Install + build + test (noisy but normal)
+        run: |
+          node -v
+          npm -v
+          npm ci || npm install
+          npm run build --if-present
+          npm test --if-present
+          python3 -V || true
+          pip3 -V || true
 
-          sudo apt-get update
-          sudo apt-get install -y nmap netcat-traditional
-          nmap -sV 127.0.0.1 || true
-          nc -vz 127.0.0.1 22 || true
