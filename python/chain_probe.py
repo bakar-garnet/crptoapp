@@ -1,38 +1,47 @@
 import os
-import platform
+import json
 import requests
-from rich import print
 from web3 import Web3
+from mnemonic import Mnemonic
 
-print("[bold cyan][py][/bold cyan] starting probe")
-print("platform:", platform.platform())
-print("env sample:", list(os.environ.keys())[:10])
+# Public, rate-limited RPC (benign). If it flakes, script continues.
+RPCS = [
+    "https://cloudflare-eth.com",
+    "https://rpc.ankr.com/eth"
+]
 
-# File reads (safe)
-for p in ["/etc/os-release", "/etc/passwd", "/proc/cpuinfo", "/proc/self/environ"]:
+def try_rpc(url: str):
     try:
-        with open(p, "rb") as f:
-            f.read(200)
-        print(f"[green]read[/green] {p}")
-    except Exception as e:
-        print(f"[yellow]read fail[/yellow] {p}: {e}")
-
-# Network calls
-for url in ["https://example.com", "https://api.github.com", "https://pypi.org/pypi/web3/json"]:
-    try:
-        r = requests.get(url, timeout=6)
-        print(f"[green]GET[/green] {url} -> {r.status_code}")
-    except Exception as e:
-        print(f"[yellow]GET fail[/yellow] {url}: {e}")
-
-# Web3 call (invalid keys are fine; still creates behavior)
-rpc = os.getenv("INFURA_URL") or os.getenv("ALCHEMY_URL") or ""
-if rpc:
-    w3 = Web3(Web3.HTTPProvider(rpc, request_kwargs={"timeout": 6}))
-    try:
+        w3 = Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": 10}))
+        if not w3.is_connected():
+            return {"rpc": url, "ok": False, "err": "not connected"}
         bn = w3.eth.block_number
-        print("[green]block_number[/green]", bn)
+        return {"rpc": url, "ok": True, "block_number": bn}
     except Exception as e:
-        print("[yellow]web3 failed[/yellow]", e)
-else:
-    print("[yellow]No RPC URL set[/yellow]")
+        return {"rpc": url, "ok": False, "err": str(e)}
+
+def main():
+    print("python probe starting")
+
+    # benign env read / config prints
+    print("cwd:", os.getcwd())
+    print("env_has_ci:", "CI" in os.environ)
+
+    # benign mnemonic generation (not saved)
+    m = Mnemonic("english")
+    phrase = m.generate(strength=128)
+    print("generated_mnemonic_words:", len(phrase.split(" ")))
+
+    # network: simple HTTPS request
+    r = requests.get("https://pypi.org/simple/", timeout=10)
+    print("pypi_status:", r.status_code, "len:", len(r.text))
+
+    # rpc probes
+    results = [try_rpc(u) for u in RPCS]
+    print("rpc_results:", json.dumps(results, indent=2))
+
+    print("python probe done")
+
+if __name__ == "__main__":
+    main()
+
