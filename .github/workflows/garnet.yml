@@ -10,22 +10,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sanity check token exists
+        run: |
+          if [ -z "${{ secrets.GARNET_API_TOKEN }}" ]; then
+            echo "GARNET_API_TOKEN is EMPTY / not injected"
+            exit 1
+          else
+            echo "GARNET_API_TOKEN present"
+          fi
+
       - name: Add Garnet Monitor
         uses: garnet-org/action@v1
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
-      # This is what should trigger simple detections like npm registry connections
-      - name: Generate runtime activity
+      - name: Generate some activity (only runs if monitor attached)
         run: |
           set -euxo pipefail
           node -v
           npm -v
-          npm ci || npm install
-          npm pack || true
-          curl -I https://registry.npmjs.org/ || true
-          python3 -V
-          pip3 -V
-          pip3 install requests
-          python3 -c "import requests; print(requests.get('https://pypi.org/simple/').status_code)"
+          npm init -y
+          npm i lodash
+          curl -I https://registry.npmjs.org/
 
