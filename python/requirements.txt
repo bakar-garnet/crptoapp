@@ -1,0 +1,5 @@
+web3==6.20.2
+eth-account==0.13.3
+requests==2.32.3
+mnemonic==0.21
+bip-utils==2.9.3
