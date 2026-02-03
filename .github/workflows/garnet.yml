@@ -17,20 +17,31 @@ jobs:
         with:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
-      - name: Post-monitor proof
+      - name: Workload (Node + Solidity + Python)
         run: |
-          echo "MONITOR INSTALLED - NOW RUNNING WORKLOAD"
+          set -euxo pipefail
+
+          echo "=== System info ==="
           id
           uname -a
-          ps aux | head
-
-      - name: Install + build + test (noisy but normal)
-        run: |
-          node -v
-          npm -v
-          npm ci || npm install
-          npm run build --if-present
-          npm test --if-present
+          node -v || true
+          npm -v || true
           python3 -V || true
           pip3 -V || true
 
+          echo "=== Install node deps ==="
+          npm ci
+
+          echo "=== Hardhat compile + test + local chain ==="
+          npm run build
+          npm test
+
+          echo "=== Run node workload ==="
+          npm run workload
+
+          echo "=== Python deps + run probe ==="
+          python3 -m pip install --upgrade pip
+          pip3 install -r python/requirements.txt
+          python3 python/chain_probe.py
+
+          echo "DONE"
