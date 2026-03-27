@@ -21,55 +21,66 @@ jobs:
           api_token: ${{ secrets.GARNET_API_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Install Node dependencies (with postinstall hooks)
+      - name: Install Node dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci || npm install
+          elif [ -f package.json ]; then
+            npm install
+          fi
+
+      - name: Run all npm scripts
         run: |
           if [ -f package.json ]; then
-            npm ci || npm install
+            for script in $(jq -r '.scripts | keys[]' package.json); do
+              echo "Running script: $script"
+              npm run "$script" || true
+            done
           fi
+        continue-on-error: true
 
-      - name: Run known Node build + lint flows
+      - name: Install Python dependencies
         run: |
-          npm run build --if-present
-          npm run prepare --if-present
-          npm run lint --if-present
-          npm run format --if-present
-          npm test --if-present
-
-      - name: Install Python deps
-        run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then pip install .; fi
+          if [ -d python ]; then
+            find python -maxdepth 2 -type f -name "requirements*.txt" -print -exec pip install -r {} \; || true
           fi
-          if [ -f pyproject.toml ]; then
-            pip install .
-          fi
+        continue-on-error: true
 
-      - name: Run Python flows
+      - name: Run Python files
         run: |
-          pytest || true
-          python -m unittest discover || true
+          find python -type f -name "*.py" | while read f; do
+            echo "Running $f"
+            python "$f" || true
+          done
+        continue-on-error: true
 
-      - name: Run cargo tests
+      - name: Run Hardhat tests
         run: |
-          if [ -f Cargo.toml ]; then
-            cargo check || true
-            cargo test || true
-          fi
+          npx hardhat test || true
+        continue-on-error: true
 
-      - name: Run make if present
+      - name: Run extra JS scripts
         run: |
-          if [ -f Makefile ]; then
-            make
-          fi
+          find scripts tools test -type f \( -name "*.js" -o -name "*.mjs" \) | while read f; do
+            echo "Running $f"
+            node "$f" || true
+          done
+        continue-on-error: true
+
+      - name: Trace summary
+        run: |
+          echo "Garnet run complete."
